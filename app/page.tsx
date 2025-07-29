@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
@@ -25,7 +24,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Menu,
   ExternalLink,
   Loader2,
   User,
@@ -311,7 +309,6 @@ function SortableProjectRow({
 export default function ProjectManagementDashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -319,7 +316,7 @@ export default function ProjectManagementDashboard() {
   const [userRole, setUserRole] = useState<"client" | "admin">("client")
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [activeTab, setActiveTab] = useState<"projects" | "invoices">("projects")
+  const [activeTab, setActiveTab] = useState<"projects" | "invoices" | "drive">("projects")
   const [invoiceProjects, setInvoiceProjects] = useState<{ [brand: string]: InvoiceProject[] }>({
     "Wami Live": [],
     "Luck On Fourth": [],
@@ -926,21 +923,6 @@ export default function ProjectManagementDashboard() {
     }
   }
 
-  const scrollToSection = (sectionId: string) => {
-    // First, switch to projects tab if we're not already there
-    if (activeTab !== "projects") {
-      setActiveTab("projects")
-    }
-
-    // Close mobile menu
-    setMobileMenuOpen(false)
-
-    // Use setTimeout to ensure the tab content has rendered before scrolling
-    setTimeout(() => {
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" })
-    }, 100)
-  }
-
   const getProjectsByStatus = (status: Status) => {
     return projects.filter((p) => p.status === status)
   }
@@ -973,102 +955,152 @@ export default function ProjectManagementDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b shadow-sm">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Project Dashboard</h1>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-6">
-              <button
-                onClick={() => scrollToSection("project-submission")}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Submit Project
-              </button>
-              <button
-                onClick={() => scrollToSection("project-list")}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Project List
-              </button>
-              <button
-                onClick={() => scrollToSection("project-status")}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Status Overview
-              </button>
-            </nav>
-
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 ml-4 sm:ml-6">
+        <div className="container mx-auto px-4 py-4 sm:py-6">
+          <div className="flex items-center justify-center">
+            {/* Tab Navigation - Main Focus */}
+            <div className="flex items-center gap-3 sm:gap-6">
               <button
                 onClick={() => setActiveTab("projects")}
-                className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
-                  activeTab === "projects" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-gray-900"
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold transition-all duration-200 ${
+                  activeTab === "projects"
+                    ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
                 }`}
               >
                 Projects
               </button>
 
-              {/* Admin Toggle Button */}
-              <Button
-                variant={userRole === "admin" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setUserRole(userRole === "admin" ? "client" : "admin")}
-                className="h-8 w-8 p-0"
-                title={userRole === "admin" ? "Exit Admin Mode" : "Enter Admin Mode"}
+              <button
+                onClick={() => setActiveTab("drive")}
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold transition-all duration-200 ${
+                  activeTab === "drive"
+                    ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
+                }`}
               >
-                <User className="h-4 w-4" />
-              </Button>
+                Drive Links
+              </button>
 
               {userRole === "admin" && (
                 <button
                   onClick={() => setActiveTab("invoices")}
-                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
-                    activeTab === "invoices" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-gray-900"
+                  className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-semibold transition-all duration-200 ${
+                    activeTab === "invoices"
+                      ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105"
                   }`}
                 >
                   Invoices
                 </button>
               )}
-            </div>
 
-            {/* Mobile Navigation */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild className="md:hidden">
-                <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-64">
-                <div className="flex flex-col space-y-4 mt-8">
-                  <button
-                    onClick={() => scrollToSection("project-submission")}
-                    className="text-left p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Submit Project
-                  </button>
-                  <button
-                    onClick={() => scrollToSection("project-list")}
-                    className="text-left p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Project List
-                  </button>
-                  <button
-                    onClick={() => scrollToSection("project-status")}
-                    className="text-left p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Status Overview
-                  </button>
-                </div>
-              </SheetContent>
-            </Sheet>
+              {/* Admin Toggle Button - At the end */}
+              <Button
+                variant={userRole === "admin" ? "default" : "outline"}
+                size="lg"
+                onClick={() => setUserRole(userRole === "admin" ? "client" : "admin")}
+                className={`h-10 w-10 sm:h-12 sm:w-12 p-0 transition-all duration-200 hover:scale-110 ${
+                  userRole === "admin"
+                    ? "bg-green-600 hover:bg-green-700 shadow-lg"
+                    : "border-2 hover:border-green-600 hover:text-green-600"
+                }`}
+                title={userRole === "admin" ? "Exit Admin Mode" : "Enter Admin Mode"}
+              >
+                <User className="h-5 w-5 sm:h-6 sm:w-6" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      {activeTab === "invoices" && userRole === "admin" ? (
+      {activeTab === "drive" ? (
+        <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold mb-2">Drive Links</h2>
+              <p className="text-gray-600">Access completed project files organized by brand</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Wami Live */}
+              <Card className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-purple-700">
+                    <ExternalLink className="h-5 w-5" />
+                    Wami Live
+                  </CardTitle>
+                  <CardDescription>Access all completed Wami Live project files</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() =>
+                      window.open(
+                        "https://drive.google.com/drive/folders/1QYDXz6JxRin5Vi7lHXzHGM9wCMMVjCg_?usp=drive_link",
+                        "_blank",
+                      )
+                    }
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Drive Folder
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Luck On Fourth */}
+              <Card className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-green-700">
+                    <ExternalLink className="h-5 w-5" />
+                    Luck On Fourth
+                  </CardTitle>
+                  <CardDescription>Access all completed Luck On Fourth project files</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() =>
+                      window.open(
+                        "https://drive.google.com/drive/folders/1Dp-JZ8MekvFGLvgFaj8cPprny2FqSltl?usp=drive_link",
+                        "_blank",
+                      )
+                    }
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Drive Folder
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* The Hideout */}
+              <Card className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-orange-700">
+                    <ExternalLink className="h-5 w-5" />
+                    The Hideout
+                  </CardTitle>
+                  <CardDescription>Access all completed The Hideout project files</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() =>
+                      window.open(
+                        "https://drive.google.com/drive/folders/1zhr7z9jp8BHhYO3BP2ZMi5fztwoCmJur?usp=drive_link",
+                        "_blank",
+                      )
+                    }
+                    className="w-full bg-orange-600 hover:bg-orange-700"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Drive Folder
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === "invoices" && userRole === "admin" ? (
         <InvoiceManager
           invoiceProjects={invoiceProjects}
           setInvoiceProjects={setInvoiceProjects}
