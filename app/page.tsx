@@ -897,8 +897,18 @@ export default function ProjectManagementDashboard() {
   }
 
   const scrollToSection = (sectionId: string) => {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" })
+    // First, switch to projects tab if we're not already there
+    if (activeTab !== "projects") {
+      setActiveTab("projects")
+    }
+
+    // Close mobile menu
     setMobileMenuOpen(false)
+
+    // Use setTimeout to ensure the tab content has rendered before scrolling
+    setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" })
+    }, 100)
   }
 
   const getProjectsByStatus = (status: Status) => {
