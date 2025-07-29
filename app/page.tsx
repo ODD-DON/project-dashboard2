@@ -324,7 +324,7 @@ export default function ProjectManagementDashboard() {
     type: "" as ProjectType,
     description: "",
     deadline: undefined as Date | undefined,
-    priority: 1 as Priority,
+    priority: 1 as Priority, // This will be updated after projects load
     files: [] as ProjectFile[],
   })
 
@@ -370,6 +370,17 @@ export default function ProjectManagementDashboard() {
   useEffect(() => {
     loadProjects()
   }, [])
+
+  // Update default priority when active projects change
+  useEffect(() => {
+    if (!editingProject) {
+      const activeProjectsCount = projects.filter((p) => p.status !== "Completed").length
+      setFormData((prev) => ({
+        ...prev,
+        priority: activeProjectsCount + 1,
+      }))
+    }
+  }, [projects, editingProject])
 
   const ensureTableExists = async () => {
     try {
@@ -582,7 +593,7 @@ export default function ProjectManagementDashboard() {
         type: "" as ProjectType,
         description: "",
         deadline: undefined,
-        priority: projects.length + 1,
+        priority: activeProjects.length + 1, // This will be the next logical number
         files: [],
       })
 
@@ -1275,7 +1286,7 @@ export default function ProjectManagementDashboard() {
                             type: "" as ProjectType,
                             description: "",
                             deadline: undefined,
-                            priority: 1 as Priority,
+                            priority: (activeProjects.length + 1) as Priority, // Use activeProjects
                             files: [],
                           })
                         }}
