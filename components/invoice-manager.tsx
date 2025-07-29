@@ -294,21 +294,79 @@ export function InvoiceManager({
 
   const getNextInvoiceNumber = async (brand: string): Promise<number> => {
     try {
-      // Use the database function to get and increment the invoice number atomically
-      const { data, error } = await supabase.rpc("get_next_invoice_number", {
-        brand_name: brand,
-      })
+      console.log(`Getting next invoice number for brand: ${brand}`)
 
-      if (error) {
-        console.error("Error getting next invoice number:", error)
-        // Fallback to local state if database fails
+      // First, let's try to get the current counter to see if the table exists
+      const { data: currentCounter, error: selectError } = await supabase
+        .from("invoice_counters")
+        .select("current_number")
+        .eq("brand", brand)
+        .single()
+
+      if (selectError) {
+        console.error("Error reading invoice counter:", selectError)
+
+        // If table doesn't exist or brand doesn't exist, create it
+        if (selectError.code === "PGRST116" || selectError.message.includes("does not exist")) {
+          console.log("Creating new invoice counter for brand:", brand)
+
+          const { data: insertData, error: insertError } = await supabase
+            .from("invoice_counters")
+            .insert([{ brand, current_number: 1 }])
+            .select("current_number")
+            .single()
+
+          if (insertError) {
+            console.error("Error creating invoice counter:", insertError)
+            return invoiceNumbers[brand] || 1
+          }
+
+          // Update the counter to 2 and return 1 for this invoice
+          await supabase
+            .from("invoice_counters")
+            .update({ current_number: 2, updated_at: new Date().toISOString() })
+            .eq("brand", brand)
+
+          return 1
+        }
+
         return invoiceNumbers[brand] || 1
       }
 
-      return data || 1
+      console.log(`Current counter for ${brand}:`, currentCounter.current_number)
+
+      // Try using the RPC function first
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("get_next_invoice_number", {
+        brand_name: brand,
+      })
+
+      if (rpcError) {
+        console.error("RPC function error:", rpcError)
+
+        // Fallback: manually update the counter
+        const nextNumber = currentCounter.current_number
+        const { error: updateError } = await supabase
+          .from("invoice_counters")
+          .update({
+            current_number: nextNumber + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("brand", brand)
+
+        if (updateError) {
+          console.error("Error updating counter manually:", updateError)
+          return invoiceNumbers[brand] || 1
+        }
+
+        console.log(`Manually incremented ${brand} counter to:`, nextNumber + 1)
+        return nextNumber
+      }
+
+      console.log(`RPC function returned:`, rpcResult)
+      return rpcResult || 1
     } catch (error) {
       console.error("Error getting next invoice number:", error)
-      // Fallback to local state if database fails
+      // Fallback to local state if everything fails
       return invoiceNumbers[brand] || 1
     }
   }
@@ -322,8 +380,11 @@ export function InvoiceManager({
 
     try {
       // Get the next invoice number from database
+      console.log(`Generating invoice for ${brand}`)
       const invoiceNumber = await getNextInvoiceNumber(brand)
+      console.log(`Got invoice number: ${invoiceNumber}`)
       const invoiceNumberString = invoiceNumber.toString().padStart(3, "0")
+      console.log(`Formatted invoice number: ${invoiceNumberString}`)
 
       const doc = new jsPDF()
       const currentDate = new Date()
