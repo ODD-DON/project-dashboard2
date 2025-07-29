@@ -28,6 +28,7 @@ import {
   Menu,
   ExternalLink,
   Loader2,
+  User,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -116,12 +117,14 @@ function MobileProjectCard({
   onDelete,
   onEdit,
   onProjectClick,
+  userRole,
 }: {
   project: Project
   onStatusChange: (id: string, status: Status) => void
   onDelete: (id: string) => void
   onEdit: (project: Project) => void
   onProjectClick: (project: Project) => void
+  userRole: "client" | "admin"
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
 
@@ -184,16 +187,22 @@ function MobileProjectCard({
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span className="text-sm text-gray-500">Due: {format(project.deadline, "MMM dd, yyyy")}</span>
-            <Select value={project.status} onValueChange={(value: Status) => onStatusChange(project.id, value)}>
-              <SelectTrigger className="w-full sm:w-36 h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
+            {userRole === "admin" ? (
+              <Select value={project.status} onValueChange={(value: Status) => onStatusChange(project.id, value)}>
+                <SelectTrigger className="w-full sm:w-36 h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="In Progress">In Progress</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className={`${statusColors[project.status]} text-xs`}>
+                {project.status}
+              </Badge>
+            )}
           </div>
         </div>
       </CardContent>
@@ -207,12 +216,14 @@ function SortableProjectRow({
   onDelete,
   onEdit,
   onProjectClick,
+  userRole,
 }: {
   project: Project
   onStatusChange: (id: string, status: Status) => void
   onDelete: (id: string) => void
   onEdit: (project: Project) => void
   onProjectClick: (project: Project) => void
+  userRole: "client" | "admin"
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: project.id })
 
@@ -261,16 +272,22 @@ function SortableProjectRow({
         </Badge>
       </TableCell>
       <TableCell className="w-[140px]">
-        <Select value={project.status} onValueChange={(value: Status) => onStatusChange(project.id, value)}>
-          <SelectTrigger className="w-[130px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="In Progress">In Progress</SelectItem>
-            <SelectItem value="Completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
+        {userRole === "admin" ? (
+          <Select value={project.status} onValueChange={(value: Status) => onStatusChange(project.id, value)}>
+            <SelectTrigger className="w-[130px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="In Progress">In Progress</SelectItem>
+              <SelectItem value="Completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <Badge variant="outline" className={`${statusColors[project.status]} text-xs`}>
+            {project.status}
+          </Badge>
+        )}
       </TableCell>
       <TableCell className="w-[100px]">
         <div className="flex gap-1">
@@ -298,6 +315,8 @@ export default function ProjectManagementDashboard() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  const [userRole, setUserRole] = useState<"client" | "admin">("client")
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [activeTab, setActiveTab] = useState<"projects" | "invoices">("projects")
@@ -990,14 +1009,28 @@ export default function ProjectManagementDashboard() {
               >
                 Projects
               </button>
-              <button
-                onClick={() => setActiveTab("invoices")}
-                className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
-                  activeTab === "invoices" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-gray-900"
-                }`}
+
+              {/* Admin Toggle Button */}
+              <Button
+                variant={userRole === "admin" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setUserRole(userRole === "admin" ? "client" : "admin")}
+                className="h-8 w-8 p-0"
+                title={userRole === "admin" ? "Exit Admin Mode" : "Enter Admin Mode"}
               >
-                Invoices
-              </button>
+                <User className="h-4 w-4" />
+              </Button>
+
+              {userRole === "admin" && (
+                <button
+                  onClick={() => setActiveTab("invoices")}
+                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-colors ${
+                    activeTab === "invoices" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  Invoices
+                </button>
+              )}
             </div>
 
             {/* Mobile Navigation */}
@@ -1035,7 +1068,7 @@ export default function ProjectManagementDashboard() {
       </header>
 
       {/* Main Content */}
-      {activeTab === "invoices" ? (
+      {activeTab === "invoices" && userRole === "admin" ? (
         <InvoiceManager
           invoiceProjects={invoiceProjects}
           setInvoiceProjects={setInvoiceProjects}
@@ -1330,6 +1363,7 @@ export default function ProjectManagementDashboard() {
                             onDelete={handleDelete}
                             onEdit={handleEdit}
                             onProjectClick={setSelectedProject}
+                            userRole={userRole}
                           />
                         ))}
                       </SortableContext>
@@ -1363,6 +1397,7 @@ export default function ProjectManagementDashboard() {
                                 onDelete={handleDelete}
                                 onEdit={handleEdit}
                                 onProjectClick={setSelectedProject}
+                                userRole={userRole}
                               />
                             ))}
                           </SortableContext>
@@ -1478,7 +1513,7 @@ export default function ProjectManagementDashboard() {
                         <CheckCircle className="h-4 w-4 md:h-5 md:w-5" />
                         Completed ({getProjectsByStatus("Completed").length})
                       </CardTitle>
-                      {getProjectsByStatus("Completed").length > 0 && (
+                      {getProjectsByStatus("Completed").length > 0 && userRole === "admin" && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -1651,18 +1686,20 @@ export default function ProjectManagementDashboard() {
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Project
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      handleStatusChange(
-                        selectedProject.id,
-                        selectedProject.status === "Completed" ? "In Progress" : "Completed",
-                      )
-                    }}
-                    className="flex-1"
-                  >
-                    {selectedProject.status === "Completed" ? "Mark In Progress" : "Mark Complete"}
-                  </Button>
+                  {userRole === "admin" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        handleStatusChange(
+                          selectedProject.id,
+                          selectedProject.status === "Completed" ? "In Progress" : "Completed",
+                        )
+                      }}
+                      className="flex-1"
+                    >
+                      {selectedProject.status === "Completed" ? "Mark In Progress" : "Mark Complete"}
+                    </Button>
+                  )}
                   <Button
                     variant="destructive"
                     onClick={() => {
