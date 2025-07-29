@@ -157,6 +157,29 @@ export function InvoiceManager({
         })
 
         setExportedInvoices(groupedExportedData)
+
+        // Load current invoice numbers from database
+        const { data: countersData, error: countersError } = await supabase
+          .from("invoice_counters")
+          .select("brand, current_number")
+
+        if (countersError) {
+          console.error("Error loading invoice counters:", countersError)
+          // Don't show error to user, just use defaults
+        } else if (countersData) {
+          const counters: { [brand: string]: number } = {
+            "Wami Live": 1,
+            "Luck On Fourth": 1,
+            "The Hideout": 1,
+          }
+
+          countersData.forEach((counter: any) => {
+            counters[counter.brand] = counter.current_number
+          })
+
+          setInvoiceNumbers(counters)
+        }
+
         toast.success("Invoice data loaded from database!")
       } catch (error) {
         console.error("Error loading invoice data:", error)
@@ -269,6 +292,27 @@ export function InvoiceManager({
     }
   }
 
+  const getNextInvoiceNumber = async (brand: string): Promise<number> => {
+    try {
+      // Use the database function to get and increment the invoice number atomically
+      const { data, error } = await supabase.rpc("get_next_invoice_number", {
+        brand_name: brand,
+      })
+
+      if (error) {
+        console.error("Error getting next invoice number:", error)
+        // Fallback to local state if database fails
+        return invoiceNumbers[brand] || 1
+      }
+
+      return data || 1
+    } catch (error) {
+      console.error("Error getting next invoice number:", error)
+      // Fallback to local state if database fails
+      return invoiceNumbers[brand] || 1
+    }
+  }
+
   const generateInvoicePDF = async (brand: string) => {
     const projects = invoiceProjects[brand]
     if (!projects || projects.length === 0) {
@@ -276,113 +320,116 @@ export function InvoiceManager({
       return
     }
 
-    const doc = new jsPDF()
-    const currentDate = new Date()
-    const invoiceNumber = invoiceNumbers[brand].toString().padStart(3, "0")
-
-    // Header
-    doc.setFontSize(20)
-    doc.setFont("helvetica", "bold")
-    doc.text("INVOICE", 20, 30)
-
-    // Invoice details
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Invoice #: ${invoiceNumber}`, 20, 45)
-    doc.text(`Date: ${format(currentDate, "MM/dd/yyyy")}`, 20, 55)
-
-    // From section - simplified
-    doc.setFont("helvetica", "bold")
-    doc.text("FROM:", 20, 75)
-    doc.setFont("helvetica", "normal")
-    doc.text("Julio Aleman", 20, 85)
-    doc.text("Graphic Design Services", 20, 95)
-
-    // To section
-    doc.setFont("helvetica", "bold")
-    doc.text("BILL TO:", 120, 75)
-    doc.setFont("helvetica", "normal")
-    doc.text(brandClients[brand as keyof typeof brandClients], 120, 85)
-
-    // Projects table
-    let yPos = 130
-    doc.setFont("helvetica", "bold")
-    doc.text("Description", 20, yPos)
-    doc.text("Type", 100, yPos)
-    doc.text("Amount", 150, yPos)
-
-    // Table line
-    doc.line(20, yPos + 5, 190, yPos + 5)
-    yPos += 15
-
-    doc.setFont("helvetica", "normal")
-    let total = 0
-
-    projects.forEach((project) => {
-      const price = project.invoicePrice || 0
-      total += price
-
-      // Truncate long titles
-      const title = project.title.length > 30 ? project.title.substring(0, 30) + "..." : project.title
-
-      doc.text(title, 20, yPos)
-      doc.text(project.type, 100, yPos)
-      doc.text(`$${price.toFixed(2)}`, 150, yPos)
-      yPos += 10
-
-      // Add new page if needed
-      if (yPos > 250) {
-        doc.addPage()
-        yPos = 30
-      }
-    })
-
-    // Total
-    yPos += 10
-    doc.line(140, yPos, 190, yPos)
-    yPos += 10
-    doc.setFont("helvetica", "bold")
-    doc.text(`TOTAL: $${total.toFixed(2)}`, 140, yPos)
-
-    // Payment info only
-    yPos += 30
-    doc.setFont("helvetica", "bold")
-    doc.text("PAYMENT INFORMATION:", 20, yPos)
-    doc.setFont("helvetica", "normal")
-    yPos += 10
-    doc.text("Zelle: (630) 270-9307", 20, yPos)
-    yPos += 10
-    doc.text("PayPal: Julioaseves@gmail.com", 20, yPos)
-
-    // Save PDF with new naming format
-    const brandName = brand
-      .replace(/\s+/g, "_")
-      .replace("Luck_On_Fourth", "LUCK_ON_FOURTH")
-      .replace("Wami_Live", "WAMI_LIVE")
-      .replace("The_Hideout", "THE_HIDEOUT")
-    const fileName = `${brandName}_Invoice_${format(currentDate, "M-dd-yy")}.pdf`
-
-    // Track exported invoice
-    const exportedInvoice = {
-      id: Date.now().toString(),
-      invoiceNumber,
-      fileName,
-      totalAmount: total,
-      exportedAt: currentDate,
-      isPaid: false,
-      projects: [...projects],
-    }
-
-    // Update exported invoices and save to database
-    const newExportedInvoices = {
-      ...exportedInvoices,
-      [brand]: [...exportedInvoices[brand], exportedInvoice],
-    }
-
-    setExportedInvoices(newExportedInvoices)
-
-    // Save to database
     try {
+      // Get the next invoice number from database
+      const invoiceNumber = await getNextInvoiceNumber(brand)
+      const invoiceNumberString = invoiceNumber.toString().padStart(3, "0")
+
+      const doc = new jsPDF()
+      const currentDate = new Date()
+
+      // Header
+      doc.setFontSize(20)
+      doc.setFont("helvetica", "bold")
+      doc.text("INVOICE", 20, 30)
+
+      // Invoice details
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "normal")
+      doc.text(`Invoice #: ${invoiceNumberString}`, 20, 45)
+      doc.text(`Date: ${format(currentDate, "MM/dd/yyyy")}`, 20, 55)
+
+      // From section - simplified
+      doc.setFont("helvetica", "bold")
+      doc.text("FROM:", 20, 75)
+      doc.setFont("helvetica", "normal")
+      doc.text("Julio Aleman", 20, 85)
+      doc.text("Graphic Design Services", 20, 95)
+
+      // To section
+      doc.setFont("helvetica", "bold")
+      doc.text("BILL TO:", 120, 75)
+      doc.setFont("helvetica", "normal")
+      doc.text(brandClients[brand as keyof typeof brandClients], 120, 85)
+
+      // Projects table
+      let yPos = 130
+      doc.setFont("helvetica", "bold")
+      doc.text("Description", 20, yPos)
+      doc.text("Type", 100, yPos)
+      doc.text("Amount", 150, yPos)
+
+      // Table line
+      doc.line(20, yPos + 5, 190, yPos + 5)
+      yPos += 15
+
+      doc.setFont("helvetica", "normal")
+      let total = 0
+
+      projects.forEach((project) => {
+        const price = project.invoicePrice || 0
+        total += price
+
+        // Truncate long titles
+        const title = project.title.length > 30 ? project.title.substring(0, 30) + "..." : project.title
+
+        doc.text(title, 20, yPos)
+        doc.text(project.type, 100, yPos)
+        doc.text(`$${price.toFixed(2)}`, 150, yPos)
+        yPos += 10
+
+        // Add new page if needed
+        if (yPos > 250) {
+          doc.addPage()
+          yPos = 30
+        }
+      })
+
+      // Total
+      yPos += 10
+      doc.line(140, yPos, 190, yPos)
+      yPos += 10
+      doc.setFont("helvetica", "bold")
+      doc.text(`TOTAL: $${total.toFixed(2)}`, 140, yPos)
+
+      // Payment info only
+      yPos += 30
+      doc.setFont("helvetica", "bold")
+      doc.text("PAYMENT INFORMATION:", 20, yPos)
+      doc.setFont("helvetica", "normal")
+      yPos += 10
+      doc.text("Zelle: (630) 270-9307", 20, yPos)
+      yPos += 10
+      doc.text("PayPal: Julioaseves@gmail.com", 20, yPos)
+
+      // Save PDF with new naming format
+      const brandName = brand
+        .replace(/\s+/g, "_")
+        .replace("Luck_On_Fourth", "LUCK_ON_FOURTH")
+        .replace("Wami_Live", "WAMI_LIVE")
+        .replace("The_Hideout", "THE_HIDEOUT")
+      const fileName = `${brandName}_Invoice_${format(currentDate, "M-dd-yy")}.pdf`
+
+      // Track exported invoice
+      const exportedInvoice = {
+        id: Date.now().toString(),
+        invoiceNumber: invoiceNumberString,
+        fileName,
+        totalAmount: total,
+        exportedAt: currentDate,
+        isPaid: false,
+        projects: [...projects],
+      }
+
+      // Update exported invoices and save to database
+      const newExportedInvoices = {
+        ...exportedInvoices,
+        [brand]: [...exportedInvoices[brand], exportedInvoice],
+      }
+
+      setExportedInvoices(newExportedInvoices)
+
+      // Save to database
       const { error } = await supabase.from("exported_invoices").insert([
         {
           brand,
@@ -400,44 +447,37 @@ export function InvoiceManager({
         toast.error("Failed to save invoice to database")
         return
       }
-    } catch (error) {
-      console.error("Error saving exported invoice to database:", error)
-      toast.error("Failed to save invoice to database")
-      return
-    }
 
-    doc.save(fileName)
+      doc.save(fileName)
 
-    // Update invoice number and clear projects
-    setInvoiceNumbers((prev) => ({
-      ...prev,
-      [brand]: prev[brand] + 1,
-    }))
+      // Update local invoice number state to reflect the new number
+      setInvoiceNumbers((prev) => ({
+        ...prev,
+        [brand]: invoiceNumber + 1,
+      }))
 
-    // Clear invoice projects and save to database
-    const clearedInvoiceProjects = {
-      ...invoiceProjects,
-      [brand]: [],
-    }
+      // Clear invoice projects and save to database
+      const clearedInvoiceProjects = {
+        ...invoiceProjects,
+        [brand]: [],
+      }
 
-    setInvoiceProjects(clearedInvoiceProjects)
+      setInvoiceProjects(clearedInvoiceProjects)
 
-    // Save cleared invoice projects to database
-    try {
-      const { error } = await supabase.from("invoice_projects").delete().eq("brand", brand)
+      // Save cleared invoice projects to database
+      const { error: clearError } = await supabase.from("invoice_projects").delete().eq("brand", brand)
 
-      if (error) {
-        console.error("Error clearing invoice projects from database:", error)
+      if (clearError) {
+        console.error("Error clearing invoice projects from database:", clearError)
         toast.error("Failed to clear invoice projects from database")
         return
       }
-    } catch (error) {
-      console.error("Error clearing invoice projects from database:", error)
-      toast.error("Failed to clear invoice projects from database")
-      return
-    }
 
-    toast.success(`Invoice exported as ${fileName} - Data saved to database!`)
+      toast.success(`Invoice #${invoiceNumberString} exported as ${fileName} - Data saved to database!`)
+    } catch (error) {
+      console.error("Error generating invoice:", error)
+      toast.error("Failed to generate invoice")
+    }
   }
 
   const handleDeleteInvoiceProject = (brand: string, projectId: string, projectTitle: string) => {
@@ -561,7 +601,8 @@ export function InvoiceManager({
                           <div className="flex-1">
                             <p className="font-medium text-sm">{invoice.fileName}</p>
                             <p className="text-xs text-gray-500">
-                              ${invoice.totalAmount.toFixed(2)} • {format(invoice.exportedAt, "MMM dd, yyyy")}
+                              #{invoice.invoiceNumber} • ${invoice.totalAmount.toFixed(2)} •{" "}
+                              {format(invoice.exportedAt, "MMM dd, yyyy")}
                             </p>
                           </div>
                           <Button
